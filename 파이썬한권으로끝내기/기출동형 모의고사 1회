@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Sep  1 20:27:22 2024
+
+@author: USER
+"""
+
+import pandas as pd
+import numpy as np
+df=pd.read_csv("https://raw.githubusercontent.com/ADPclass/ADP_book_ver01/main/data/student_data.csv")
+df
+df.info()
+display(df)
+"""
+예전에 빅데이터 분석기사 공부할때 저장해둔 코드들로 빠르게 기억 복원하기!
+https://github.com/HongHee-Lee/Bigdata_Analysis_Engineer_practical-test/blob/main/220617.%ED%98%BC%EA%B3%B5.%EC%9E%91%EC%97%85%ED%98%952%EC%9C%A0%ED%98%95.%EC%B5%9C%EC%A2%85.%EC%8B%A4%EA%B8%B03%ED%9A%8C
+"""
+pd.set_option('display.max_columns', None)    #전체 컬럼을 다보여주는 코드
+df
+
+import matplotlib.pyplot as plt
+
+plt.bar(df['grade'].value_counts().index, df['grade'].value_counts().values)
+#,반드시 있어야 한다. 안그러면 에러 발생한다
+# SyntaxError: invalid syntax. Perhaps you forgot a comma?
+
+import scipy.stats as stats
+stats.shapiro(df["grade"])
+"""샤피로 윌크 검정 결과 pvalue인 유의확률은 0.0014 정도로 나온다
+통계량이 임계값보다 작으면 귀무 가설을 기각하고, 데이터가 정규 분포를 따르지 않는 것으로 판단됩니다.
+ https://blog.naver.com/microsample/223250843551
+그니까 샤피로 윌크 검정은 정규성을 따르는지를 알아보는 검정방법인데, 
+대립가설이 틀릴확률이 0.0014라는 것이다. 
+즉, 대립가설이 틀릴확률이 너무 낮고 이말은 귀무가설이 참일 확률이 너무 낮다는 것이다.
+따라서 귀무가설을 기각하고 대립가설을 채택한다. 여기서 귀무가설은 데이터가 정규분포를 따른다는 것이다.
+결론적으로 우리는 귀무가설을 기각하고 데이터가 정규분포를 따르지 않는다고 결론을 내릴수 있다.
+"""
+
+"""
+import seaborn as sns
+df_cor=df.corr(method='pearson')
+#위코드 실행하면 ValueError: could not convert string to float: 'GP' 뜬다  
+#데이터에 영어 등 숫자 외의 문자 값이 포함되어있어서 그렇다.
+sns.heatmap(df_cor,
+            xticklabels=df_cor.columns,
+            yticklabels=df_cor.columns,
+            cmap='RdBu_r',
+            annot=True,
+            linewidth=3)
+"""
+
+#범주형 변수의 시각화
+fig, axs=plt.subplots(2,2)
+axs[0][0].bar(df['school'].value_counts().index,
+              df['school'].value_counts().values)
+#여기 까지만 하면 사분면중에 2사분면(직관적으로 첫칸)에만 표가 그려진다
+axs[0][1].bar(df['sex'].value_counts().index,
+              df['sex'].value_counts().values)
+axs[1][0].bar(df['paid'].value_counts().index,
+              df['paid'].value_counts().values)
+axs[1][1].bar(df['activities'].value_counts().index,
+              df['activities'].value_counts().values)
+
+
+
+"""
+<결측값 개수 확인 2가지 방법>
+1.결측값 개수 확인 코드는 df.isnull().sum() 임  df.isnull().count()가 아님
+
+2.
+df1 = df['goout'].value_counts(dropna=False)
+df1
+
+goout
+3.0    128
+2.0    103
+4.0     86
+5.0     53
+1.0     22
+NaN      3
+Name: count, dtype: int64
+
+nan 항목을 통해 개별 칼럼의 결측값 개수도 알수 있음
+"""
+df.isnull().sum()
+
+#2.결측치를 식별, 예측하는 두 가지 방법을 쓰고, 이를 선택한 이유를 설명하시오.
+"""수치형 변수만 결측치가 있으므로 KNN기법을 사용하여 결측치를 대체한다.
+KNN 기법을 통해 모든 결측치를 대체해본다."""
+df[df.isna().any(axis=1)]
+
+from sklearn.impute import KNNImputer
+
+#결측치가 있는 수치형 데이터만을 추출
+KNN_data=df.drop(columns=['school','sex', 'paid','activities'])
+
+#모델링
+imputer=KNNImputer()
+df_filled=imputer.fit_transform(KNN_data)
+df_filled=pd.DataFrame(df_filled, columns=KNN_data.columns)
+df[KNN_data.columns]=df_filled
+
+#결측치 확인
+df.isna().sum()
+
