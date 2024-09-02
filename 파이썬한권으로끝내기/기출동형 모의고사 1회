@@ -103,3 +103,101 @@ df[KNN_data.columns]=df_filled
 #결측치 확인
 df.isna().sum()
 
+
+#범주형 변수 인코딩이 필요한 경우
+#school, sex, paid, activities -> 이산형 / 나머지는 수치나 순위형이므로 원핫인코딩x
+df=pd.get_dummies(data=df, columns=['school','sex','paid','activities'],drop_first=True)
+df.info()
+
+#데이터 분할 방법
+#랜덤분할(train, test로 내가 지정한 비율로 분할), 층화추출 기법
+from sklearn.model_selection import train_test_split
+X=df.drop('grade', axis=1)
+y=df['grade']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=2022)
+print(X_train.shape)
+print(X_test.shape)
+print(y_train.shape)
+print(y_test.shape)
+
+#svm, xgboost, randomforest 의 공통점과 성적 예측 분석에 적합한 알고리즘인가 설명?
+"""
+종속변수의 값이 연속형이므로 회귀분석이 적합 
+세개모두 회귀분석, 분류분석 가능. 회귀분석시 svm은 커널트릭을통해,
+xgboost와 randomforest는 트리모델을 통해 다중공선성을 해결할 수 있다.
+성적이라는 연속형 변수를 예츨하기에 3가지 모델은 적합하다
+"""
+
+#svm, xgboost,randomforest세가지모델 모델링해보기
+from sklearn.svm import SVR
+from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+
+scaler=StandardScaler()
+X_train_scaled=pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns)
+X_test_scaled=pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
+
+#SVM
+"""svm의 경우는 매개변수를 디테일하게 찾아 모델 적용 . 정확도 높아짐.
+이에 반해 Randomforest와 XGBoost는 비교적 간단하게 그리드서치를 통해 매개변수를 적용시킴."""
+from sklearn.model_selection import GridSearchCV
+param_grid=[{'C':[0.1,1,10,100], 'gamma':[0.001,0.01,0.1,1,10]}]
+grid_svm=GridSearchCV(SVR(), param_grid=param_grid, cv=5)
+grid_svm.fit(X_train_scaled, y_train)
+result=pd.DataFrame(grid_svm.cv_results_['params'])
+result['mean_test_score']=grid_svm.cv_results_['mean_test_score']
+result.sort_values(by='mean_test_score', ascending=False)
+
+#SVM
+svr=SVR(C=100,gamma=0.001)
+svr.fit(X_train_scaled, y_train)
+print("R2 : ", svr.score(X_test_scaled, y_test))
+print("RMSE :", np.sqrt(mean_squared_error(y_test, svr.predict(X_test_scaled))))
+#R2 :  0.9574163452579304
+#RMSE : 0.7753004545895887
+
+#randomforest
+rf_grid=[{'max_depth': [2,4,6,8,10], 'min_samples_split': [2,4,6,8,10]}]
+rf=GridSearchCV(RandomForestRegressor(n_estimators=100), param_grid=rf_grid, cv=5)
+rf.fit(X_train, y_train)
+print(rf.best_params_)
+print("R2 : ", rf.score(X_test, y_test))
+print("RMSE : ", np.sqrt(mean_squared_error(y_test, rf.predict(X_test))))
+#{'max_depth': 8, 'min_samples_split': 2}
+#R2 :  0.9528899966058348
+#RMSE :  0.8154646519486668
+
+#xgboost
+xgb_grid=[{'max_depth':[2,4,6,8,10]}]
+xgb=GridSearchCV(XGBRegressor(n_estimators=1000), param_grid=xgb_grid, cv=5)
+xgb.fit(X_train, y_train)
+xgb.score(X_test, y_test)
+print("R : ", xgb.score(X_test, y_test))
+print("RMSE : ",np.sqrt(mean_squared_error(y_test, xgb.predict(X_test))))
+#R :  0.9569358092115691
+#RMSE :  0.7796626290745525
+
+"""
+아래는 변수중요도를 보여주는 코드 3개인데
+ValueError: tree must be Booster, XGBModel or dict instance
+이런 메세지가 뜬다 
+결국 아직 해결못함...
+
+1.
+from xgboost import plot_importance
+plot_importance(xgb)
+
+2.
+import matplotlib.pyplot as plt
+%matplotlib inline
+fig, ax = plt.subplots(figsize=(10, 12))
+plot_importance(xgb, ax=ax)
+
+3.
+from xgboost import plot_importance
+from matplotlib import pyplot
+plot_importance(xgb)
+pyplot.show()"""
